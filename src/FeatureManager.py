@@ -27,7 +27,7 @@ class FeatureManager:
             self.brandNameDf = data.attributesDf[data.attributesDf.name == "MFG Brand Name"][["product_uid", "value"]].rename(columns={"value": "brand"})
             self.brandNameDf['brand'] = self.brandNameDf['brand'].astype(str)
             self.brandNameDf.to_csv(config.brandNamePath)
-        print('   brandNameDf: \n   ', DfCustomPrintFormat(self.brandNameDf.head()))
+        print('   brandNameDf: \n   {0}\n'.format(DfCustomPrintFormat(self.brandNameDf.head())))
 
         # Color
         print("   Color...")
@@ -46,7 +46,7 @@ class FeatureManager:
             self.colorDf = self.containsColorDf.groupby('product_uid', as_index=False).agg(lambda x: ' '.join(x))
             self.colorDf['color'] = self.colorDf['color'].astype(str)
             self.colorDf.to_csv(config.colorPath)
-        print('   colorDf: \n   ', DfCustomPrintFormat(self.colorDf.head()))
+        print('   colorDf: \n   {0}\n'.format(DfCustomPrintFormat(self.colorDf.head())))
 
         # Material
         print("   Material...")
@@ -57,7 +57,7 @@ class FeatureManager:
             self.containsMaterialDf = data.attributesDf[data.attributesDf.name.str.contains("Material", na=False)][["product_uid", "value"]].rename(columns={"value": "material"})
             self.containsMaterialDf['material'] = self.containsMaterialDf['material'].astype(str)
             self.containsMaterialDf.to_csv(config.containsMaterialPath)
-        print('   containsMaterialDf: \n   ', DfCustomPrintFormat(self.containsMaterialDf.head()))
+        print('   containsMaterialDf: \n   ', (DfCustomPrintFormat(self.containsMaterialDf.head())))
         if Path(config.materialPath).is_file():
             print('   ' + config.materialPath + ' already exists. Loading...')
             self.materialDf = pd.read_csv(config.materialPath, header=0, names=["product_uid", "material"])
@@ -65,6 +65,6 @@ class FeatureManager:
             self.materialDf = self.containsMaterialDf.groupby('product_uid', as_index=False).agg(lambda x: ' '.join(x))
             self.materialDf['material'] = self.materialDf['material'].astype(str)
             self.materialDf.to_csv(config.materialPath)
-        print('   materialDf: \n   ', DfCustomPrintFormat(self.materialDf.head()))
+        print('   materialDf: \n   {0}\n'.format(DfCustomPrintFormat(self.materialDf.head())))
 
         print("Finished features engineering")
