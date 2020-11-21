@@ -1,3 +1,4 @@
 .tmp.drivedownload
 src/__pycache__
 src/mainFullRefactor*
+.idea
