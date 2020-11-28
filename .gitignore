@@ -1,6 +1,6 @@
 .tmp.drivedownload
 src/__pycache__
-src/mainFullRefactor*
+src/tmp*
 .idea
 *csv
 venv
