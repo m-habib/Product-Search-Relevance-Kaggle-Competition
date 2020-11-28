@@ -2,6 +2,7 @@
 # The final data for training will be available in allForTraining attribute after calling Preprocess function
 
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from src.DataManager import DataManager
 from src.FeatureManager import FeatureManager
@@ -27,6 +28,8 @@ def CleanData(s):
         s = " ".join(s.split())  # Replace whitespace with single space
         s = re.sub(r"([0-9]),([0-9])", r"\1 \2", s)  # Replace ',' separating numbers with single space
         s = s.replace(",", "")  # Remove ','
+        s = s.replace(")", "")  # Remove irrelevant chars
+        s = s.replace("(", "")  # Remove irrelevant chars
         s = s.replace("$", " ")  # Remove irrelevant chars
         s = s.replace("\"", " ")  # Remove irrelevant chars
         s = s.replace("?", " ")  # Remove irrelevant chars
@@ -96,18 +99,18 @@ def Lemmatize(s):
 def SpellCorrect(s):
     if s != "null" and isinstance(s, str):
         s = s.lower()
-        s = s.replace("bbq", "barbeque")
         s = s.replace("toliet", "toilet")
-        s = s.replace("airconditioner", "air conditioner")
-        s = s.replace("vinal", "vinyl")
         s = s.replace("vynal", "vinyl")
-        s = s.replace("skill", "skil")
-        s = s.replace("snowbl", "snow bl")
-        s = s.replace("plexigla", "plexi gla")
-        s = s.replace("rustoleum", "rust-oleum")
-        s = s.replace("whirpool", "whirlpool")
         s = s.replace("whirlpoolga", "whirlpool ga")
+        s = s.replace("plexigla", "plexi gla")
+        s = s.replace("vinal", "vinyl")
+        s = s.replace("snowbl", "snow bl")
+        s = s.replace("whirpool", "whirlpool")
+        s = s.replace("bbq", "barbeque")
+        s = s.replace("rustoleum", "rust-oleum")
+        s = s.replace("airconditioner", "air conditioner")
         s = s.replace("whirlpoolstainless", "whirlpool stainless")
+        s = s.replace("skill", "skil")
         #TODO: use spell checker
         return s
     else:
@@ -150,14 +153,16 @@ class Preprocessor:
             self.allDf1 = pd.merge(self.allDf1, features.colorDf, how='left', on='product_uid')
             self.allDf1 = pd.merge(self.allDf1, features.materialDf, how='left', on='product_uid')
             self.allDf1.to_csv(config.allCombinedPath.format('1'))
-        print('   1. allDf1 \n', DfCustomPrintFormat(self.allDf1.head()))
+        print('   1. allDf1 - All combined: \n\n', DfCustomPrintFormat(self.allDf1.head()))
 
+        # Clean and normalize
         print('   Cleaning and Normalize data...')
         if Path(config.allCombinedPath.format('2')).is_file():
             print('   ' + config.allCombinedPath.format('2') + ' already exists. Loading...')
             self.allDf2 = pd.read_csv(config.allCombinedPath.format('2'))
             self.allDf2 = self.allDf2.drop(self.allDf2.columns[0], axis=1)
         else:
+            # Clean and normalize
             self.allDf2 = self.allDf1
             self.allDf2['search_term'] = self.allDf2['search_term'].map(lambda x: CleanAndNormalize(x))
             self.allDf2['product_title'] = self.allDf2['product_title'].map(lambda x: CleanAndNormalize(x))
@@ -166,5 +171,13 @@ class Preprocessor:
             self.allDf2['color'] = self.allDf2['color'].astype(str).map(lambda x: CleanAndNormalize(x))
             self.allDf2['material'] = self.allDf2['material'].astype(str).map(lambda x: CleanAndNormalize(x))
             self.allDf2['product_info'] = self.allDf2['search_term'] + "\t" + self.allDf2['product_title'] + "\t" + self.allDf2['product_description']
+            # Count words
+            self.allDf2['len_of_query'] = self.allDf2['search_term'].map(lambda x: len(x.split())).astype(np.int64)
+            self.allDf2['len_of_title'] = self.allDf2['product_title'].map(lambda x: len(x.split())).astype(np.int64)
+            self.allDf2['len_of_description'] = self.allDf2['product_description'].map(lambda x: len(x.split())).astype(np.int64)
+            self.allDf2['len_of_brand'] = self.allDf2['brand'].map(lambda x: len(x.split())).astype(np.int64)
+            self.allDf2['len_of_color'] = self.allDf2['color'].astype(str).map(lambda x: len(x.split())).astype(np.int64)
+            self.allDf2['len_of_material'] = self.allDf2['material'].astype(str).map(lambda x: len(x.split())).astype(np.int64)
             self.allDf2.to_csv(config.allCombinedPath.format('2'))
-        print('   2. allDf2 \n', DfCustomPrintFormat(self.allDf2.head()))
+        print('   2. allDf2 - After cleaning and normalizing: \n\n', DfCustomPrintFormat(self.allDf2.head()))
+

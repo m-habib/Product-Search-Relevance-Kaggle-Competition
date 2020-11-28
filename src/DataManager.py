@@ -21,6 +21,14 @@ class DataManager:
         self.attributesDf = pd.read_csv(config.dataPath+'/attributes.csv', encoding="ISO-8859-1")
         print("   Loading product description data...")
         self.descriptionDf = pd.read_csv(config.dataPath+'/product_descriptions.csv', encoding="ISO-8859-1")
-        print("Finished loading data\n")
+
+        if config.developmentMode:
+            print("In development mode, taking first {0} rows of data\n".format(config.devNumRows))
+            self.trainDf = self.trainDf.head(config.devNumRows)
+            self.testDf = self.testDf.head(config.devNumRows)
+            self.attributesDf = self.attributesDf.head(config.devNumRows)
+            self.descriptionDf = self.descriptionDf.head(config.devNumRows)
+
+        print("   Finished loading data\n")
 
 
