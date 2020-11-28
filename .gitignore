@@ -2,5 +2,5 @@
 src/__pycache__
 src/mainFullRefactor*
 .idea
-processStages/all*csv
+*csv
 venv
