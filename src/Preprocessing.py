@@ -8,17 +8,17 @@ from src.FeatureManager import FeatureManager
 from src.configuration import config
 from src.utils import DfCustomPrintFormat
 from nltk.stem.porter import *
-from nltk.stem.lancaster import *
+from nltk import LancasterStemmer
 
 
 def CleanData(s):
     strNum = {'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9}
-    if isinstance(s, str):
+    if s != "null" and isinstance(s, str):
         s = s.lower()  # To lower case
         s = re.sub(r"(\w)\.([A-Z])", r"\1 \2", s)  # Restore new line and replace it with single space
         s = re.sub(r'http.*\s', r'', s)  # Remove Http URLs
-        s = s.replace(r'src=', r'', s)  # Remove HTML code
-        s = s.replace(r'alt=', r'', s)  # Remove HTML code
+        s = s.replace('src=', '')  # Remove HTML code
+        s = s.replace('alt=', '')  # Remove HTML code
         s = s.replace('/br', '')  # Remove HTML code
         s = s.replace('/centerimg', '')  # Remove HTML code
         s = s.replace('/centerbr', '')  # Remove HTML code
@@ -75,7 +75,7 @@ def CleanData(s):
 
 
 def Stem(s):
-    if isinstance(s, str):
+    if s != "null" and isinstance(s, str):
         stemmer = LancasterStemmer()
         s = (" ").join([stemmer.stem(z) for z in s.split(" ")])
         s = s.lower()
@@ -85,7 +85,7 @@ def Stem(s):
 
 
 def Lemmatize(s):
-    if isinstance(s, str):
+    if s != "null" and isinstance(s, str):
         s = s.lower()
         s = s.replace("bbq", "barbeque")
         return s
@@ -94,7 +94,7 @@ def Lemmatize(s):
 
 
 def SpellCorrect(s):
-    if isinstance(s, str):
+    if s != "null" and isinstance(s, str):
         s = s.lower()
         s = s.replace("bbq", "barbeque")
         s = s.replace("toliet", "toilet")
@@ -117,7 +117,7 @@ def SpellCorrect(s):
 def CleanAndNormalize(s):
     if isinstance(s, str):
         s = CleanData(s)
-        s = SpellCorrect
+        s = SpellCorrect(s)
         s = Stem(s)
         s = Lemmatize(s)
         return s
