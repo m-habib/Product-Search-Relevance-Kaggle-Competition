@@ -26,8 +26,6 @@ class DataManager:
             print("In development mode, taking first {0} rows of data\n".format(config.devNumRows))
             self.trainDf = self.trainDf.head(config.devNumRows)
             self.testDf = self.testDf.head(config.devNumRows)
-            self.attributesDf = self.attributesDf.head(config.devNumRows)
-            self.descriptionDf = self.descriptionDf.head(config.devNumRows)
 
         print("   Finished loading data\n")
 
