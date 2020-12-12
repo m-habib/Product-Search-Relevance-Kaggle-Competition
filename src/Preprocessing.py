@@ -4,17 +4,52 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from src.DataManager import DataManager
-from src.FeatureManager import FeatureManager
 from src.configuration import config
 from src.utils import DfCustomPrintFormat
-from nltk.stem.porter import *
 from nltk import LancasterStemmer
+from sklearn.metrics import mean_squared_error
+import sklearn.feature_extraction.text as sktf
+from nltk.stem.porter import *
+
+
+def CountCommonWords(str1, str2):
+    """Counts the common words longer than 2 chars between str1 and str2"""
+    str1Words = set(str1.split())
+    str2Words = set(str2.split())
+    commonWords = str1Words.intersection(str2Words)
+    commonWords = [word for word in commonWords if len(word) > 2]
+    return len(commonWords)
+
+
+def CosineSimilarity(data, col1, col2):
+    """Calculates Cosine Similarity between corresponding elements in col1 and col2"""
+    cos = []
+    for i in range(len(data.id)):
+        title = data[col2][i]
+        if title is None or len(title) == 0 or title == "nan":
+            cos.append(0)
+            continue
+        st = data[col1][i]
+        tfidf = sktf.TfidfVectorizer().fit_transform([st, title])
+        c = ((tfidf * tfidf.T).A)[0, 1]
+        cos.append(c)
+    return cos
+
+
+def CountOccurrences(givenString, substring):
+    """Counts occurences of substring in givenString"""
+    if len(substring) < 2:
+        return 0
+    return givenString.count(substring)
+
+
+def CalculateRmse(ground_truth, predictions):
+    return mean_squared_error(ground_truth, predictions) ** 0.5
 
 
 def CleanData(s):
     strNum = {'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9}
-    if s != "null" and isinstance(s, str):
+    if s is not None and isinstance(s, str) and len(s) > 0:
         s = s.lower()  # To lower case
         s = re.sub(r"(\w)\.([A-Z])", r"\1 \2", s)  # Restore new line and replace it with single space
         s = re.sub(r'http.*\s', r'', s)  # Remove Http URLs
@@ -74,17 +109,58 @@ def CleanData(s):
         # TODO: bbq
         return s
     else:
-        return "null"
+        return ""
 
 
 def Stem(s):
-    if s != "null" and isinstance(s, str):
+    if s is not None and isinstance(s, str) and len(s) > 0:
         stemmer = LancasterStemmer()
         s = (" ").join([stemmer.stem(z) for z in s.split(" ")])
         s = s.lower()
         return s
     else:
-        return "null"
+        return ""
+
+
+def Lemmatize(s):
+    if s is not None and isinstance(s, str) and len(s) > 0:
+        s = s.lower()
+        s = s.replace("bbq", "barbeque")
+        return s
+    else:
+        return ""
+
+
+def SpellCorrect(s):
+    if s is not None and isinstance(s, str) and len(s) > 0:
+        s = s.lower()
+        s = s.replace("toliet", "toilet")
+        s = s.replace("vynal", "vinyl")
+        s = s.replace("whirlpoolga", "whirlpool ga")
+        s = s.replace("plexigla", "plexi gla")
+        s = s.replace("vinal", "vinyl")
+        s = s.replace("snowbl", "snow bl")
+        s = s.replace("whirpool", "whirlpool")
+        s = s.replace("bbq", "barbeque")
+        s = s.replace("rustoleum", "rust-oleum")
+        s = s.replace("airconditioner", "air conditioner")
+        s = s.replace("whirlpoolstainless", "whirlpool stainless")
+        s = s.replace("skill", "skil")
+        #TODO: use spell checker
+        return s
+    else:
+        return ""
+
+
+def CleanAndNormalize(s):
+    if isinstance(s, str):
+        s = CleanData(s)
+        s = SpellCorrect(s)
+        s = Stem(s)
+        s = Lemmatize(s)
+        return s
+    else:
+        return ""
 
 
 def Lemmatize(s):
@@ -133,18 +209,21 @@ class Preprocessor:
         self.allDf1 = pd.DataFrame()
         self.allDf2 = pd.DataFrame()
         self.allDf3 = pd.DataFrame()
-        self.allDf4 = pd.DataFrame()
+        self.allDf3 = pd.DataFrame()
         self.allDf5 = pd.DataFrame()
         self.allForTraining = pd.DataFrame()
 
     def Preprocess(self, data, features):
         print('Preprocessing...')
 
+        num_train = data.trainDf.shape[0]
+        print("num_train: {0}\n\n".format(num_train))
+
         # Combine train and test data with product description and extracted features in one DF
         print('   Combining all...')
         if Path(config.allCombinedPath.format('1')).is_file():
             print('   ' + config.allCombinedPath.format('1') + ' already exists. Loading...')
-            self.allDf1 = pd.read_csv(config.allCombinedPath.format('1'))
+            self.allDf1 = pd.read_csv(config.allCombinedPath.format('1'), na_filter=False)
             self.allDf1 = self.allDf1.drop(self.allDf1.columns[0], axis=1)
         else:
             self.allDf1 = pd.concat((data.trainDf, data.testDf), axis=0, ignore_index=True)
@@ -152,14 +231,14 @@ class Preprocessor:
             self.allDf1 = pd.merge(self.allDf1, features.brandNameDf, how='left', on='product_uid')
             self.allDf1 = pd.merge(self.allDf1, features.colorDf, how='left', on='product_uid')
             self.allDf1 = pd.merge(self.allDf1, features.materialDf, how='left', on='product_uid')
-            self.allDf1.to_csv(config.allCombinedPath.format('1'))
+            self.allDf1.to_csv(config.allCombinedPath.format('1'), na_rep='')
         print('   1. allDf1 - All combined: \n\n', DfCustomPrintFormat(self.allDf1.head()))
 
         # Clean and normalize
         print('   Cleaning and Normalize data...')
         if Path(config.allCombinedPath.format('2')).is_file():
             print('   ' + config.allCombinedPath.format('2') + ' already exists. Loading...')
-            self.allDf2 = pd.read_csv(config.allCombinedPath.format('2'))
+            self.allDf2 = pd.read_csv(config.allCombinedPath.format('2'), na_filter=False)
             self.allDf2 = self.allDf2.drop(self.allDf2.columns[0], axis=1)
         else:
             # Clean and normalize
@@ -170,7 +249,7 @@ class Preprocessor:
             self.allDf2['brand'] = self.allDf2['brand'].map(lambda x: CleanAndNormalize(x))
             self.allDf2['color'] = self.allDf2['color'].astype(str).map(lambda x: CleanAndNormalize(x))
             self.allDf2['material'] = self.allDf2['material'].astype(str).map(lambda x: CleanAndNormalize(x))
-            self.allDf2['product_info'] = self.allDf2['search_term'] + "\t" + self.allDf2['product_title'] + "\t" + self.allDf2['product_description']
+
             # Count words
             self.allDf2['len_of_query'] = self.allDf2['search_term'].map(lambda x: len(x.split())).astype(np.int64)
             self.allDf2['len_of_title'] = self.allDf2['product_title'].map(lambda x: len(x.split())).astype(np.int64)
@@ -178,6 +257,53 @@ class Preprocessor:
             self.allDf2['len_of_brand'] = self.allDf2['brand'].map(lambda x: len(x.split())).astype(np.int64)
             self.allDf2['len_of_color'] = self.allDf2['color'].astype(str).map(lambda x: len(x.split())).astype(np.int64)
             self.allDf2['len_of_material'] = self.allDf2['material'].astype(str).map(lambda x: len(x.split())).astype(np.int64)
-            self.allDf2.to_csv(config.allCombinedPath.format('2'))
+            self.allDf2['len_of_search_term'] = self.allDf2['search_term'].map(lambda x: len(x))
+            self.allDf2.to_csv(config.allCombinedPath.format('2'), na_rep='')
         print('   2. allDf2 - After cleaning and normalizing: \n\n', DfCustomPrintFormat(self.allDf2.head()))
 
+        # Feature engineering - Cosine similarity, common words and ratio
+        print('   Feature Engineering...')
+        if Path(config.allCombinedPath.format('4')).is_file():
+            print('   ' + config.allCombinedPath.format('4') + ' already exists. Loading...')
+            self.allDf3 = pd.read_csv(config.allCombinedPath.format('4'), na_filter=False)
+            self.allDf3 = self.allDf3.drop(self.allDf3.columns[0], axis=1)
+        else:
+            self.allDf3 = self.allDf2
+
+            # Count Occurrences of search term as one string in product title and description
+            self.allDf3['whole_query_in_title'] = self.allDf3.apply(lambda x: CountOccurrences(x['search_term'], x['product_title']), axis=1)
+
+            # Cosine similarity between search term product title, brand and material
+            print('      Cosine Similarity...')
+            self.allDf3["title_query_cos"] = CosineSimilarity(self.allDf3, "search_term", "product_title")
+            self.allDf3["brand_query_cos"] = CosineSimilarity(self.allDf3, "search_term", "brand")
+            self.allDf3["material_query_cos"] = CosineSimilarity(self.allDf3, "search_term", "material")
+
+            # Common words
+            print('      Common Words...')
+            self.allDf3['title_query_common_words'] = self.allDf3.apply(lambda x: CountCommonWords(x['search_term'], x['product_title']), axis=1)
+            self.allDf3['description_query_common_words'] = self.allDf3.apply(lambda x: CountCommonWords(x['search_term'], x['product_description']), axis=1)
+            self.allDf3['brand_query_common_words'] = self.allDf3.apply(lambda x: CountCommonWords(x['search_term'], x['brand']), axis=1)
+            self.allDf3['color_query_common_words'] = self.allDf3.apply(lambda x: CountCommonWords(x['search_term'], x['color']), axis=1)
+            self.allDf3['material_query_common_words'] = self.allDf3.apply(lambda x: CountCommonWords(x['search_term'], x['material']), axis=1)
+
+            # Common words ratio
+            print('      Common Words Ratio...')
+            self.allDf3['ratio_title'] = self.allDf3['title_query_common_words'] / self.allDf3['len_of_query']
+            self.allDf3['ratio_description'] = self.allDf3['description_query_common_words'] / self.allDf3['len_of_query']
+            self.allDf3['ratio_brand'] = self.allDf3['brand_query_common_words'] / self.allDf3['len_of_brand']
+            self.allDf3['ratio_color'] = self.allDf3['color_query_common_words'] / self.allDf3['len_of_color']
+            self.allDf3['ratio_material'] = self.allDf3['material_query_common_words'] / self.allDf3['len_of_material']
+            self.allDf3.to_csv(config.allCombinedPath.format('4'), na_rep='')
+        print('   3. allDf3 - After Feature Engineering: \n\n', DfCustomPrintFormat(self.allDf3.head()))
+
+        # Prepare for training
+        print('   Preparing for training...')
+        if Path(config.allForTraining).is_file():
+            print('   ' + config.allForTraining + ' already exists. Loading...')
+            self.allForTraining = pd.read_csv(config.allForTraining)
+            self.allForTraining = self.allForTraining.drop(self.allForTraining.columns[0], axis=1)
+        else:
+            self.allForTraining = self.allDf3.drop(['search_term', 'product_title', 'product_description', 'brand', 'color', 'material'], axis=1)
+            self.allForTraining.to_csv(config.allForTraining)
+        print('allForTraining \n', self.allForTraining.head())
