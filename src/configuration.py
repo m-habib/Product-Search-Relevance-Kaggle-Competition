@@ -16,8 +16,8 @@ class Configuration:
         self.allCombinedPath = self.processStages + '/allCombinedDf{0}.csv'
         self.allForTraining = self.processStages + '/allForTraining.csv'
 
-        self.developmentMode = False
-        self.devNumRows = 500
+        self.developmentMode = True
+        self.devNumRows = 2000
 
 
 config = Configuration()
