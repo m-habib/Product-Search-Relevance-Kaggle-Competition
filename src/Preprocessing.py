@@ -34,27 +34,6 @@ def CountCommonWords(str1, str2):
     return len(commonWords)
 
 
-def mean_dist(data, col1, col2):
-    mean_edit_s_t = []
-    for i in range(len(data)):
-        title = data[col2][i]
-        if title is None or len(title) == 0 or title == "nan":
-            mean_edit_s_t.append(0)
-            continue
-        search = data[col1][i]
-        max_edit_s_t_arr = []
-        for s in search.split():
-            max_edit_s_t = []
-            for t in title.split():
-                a = seq_matcher(None, s, t).ratio()
-                max_edit_s_t.append(a)
-            max_edit_s_t_arr.append(max_edit_s_t)
-        l = 0
-        for item in max_edit_s_t_arr:
-            l = l + max(item)
-        mean_edit_s_t.append(l / len(max_edit_s_t_arr))
-    return mean_edit_s_t
-
 def CosineSimilarity(data, col1, col2):
     """Calculates Cosine Similarity between corresponding elements in col1 and col2"""
     cos = []
@@ -77,20 +56,8 @@ def CountOccurrences(givenString, substring):
     return givenString.count(substring)
 
 
-def fmean_squared_error(ground_truth, predictions):
-    fmean_squared_error_ = mean_squared_error(ground_truth, predictions) ** 0.5
-    return fmean_squared_error_
-
-
-
-## Dev env
-
-
-
-
-
-
-
+def CalculateRmse(ground_truth, predictions):
+    return mean_squared_error(ground_truth, predictions) ** 0.5
 
 
 def CleanData(s):
@@ -296,6 +263,7 @@ class Preprocessor:
             self.allDf2['color'] = self.allDf2['color'].astype(str).map(lambda x: CleanAndNormalize(x))
             self.allDf2['material'] = self.allDf2['material'].astype(str).map(lambda x: CleanAndNormalize(x))
             self.allDf2['product_info'] = self.allDf2['search_term'] + "\t" + self.allDf2['product_title'] + "\t" + self.allDf2['product_description']
+
             # Count words
             self.allDf2['len_of_query'] = self.allDf2['search_term'].map(lambda x: len(x.split())).astype(np.int64)
             self.allDf2['len_of_title'] = self.allDf2['product_title'].map(lambda x: len(x.split())).astype(np.int64)
@@ -303,76 +271,54 @@ class Preprocessor:
             self.allDf2['len_of_brand'] = self.allDf2['brand'].map(lambda x: len(x.split())).astype(np.int64)
             self.allDf2['len_of_color'] = self.allDf2['color'].astype(str).map(lambda x: len(x.split())).astype(np.int64)
             self.allDf2['len_of_material'] = self.allDf2['material'].astype(str).map(lambda x: len(x.split())).astype(np.int64)
+            self.allDf2['len_of_search_term'] = self.allDf2['search_term'].map(lambda x: len(x))
             self.allDf2.to_csv(config.allCombinedPath.format('2'), na_rep='')
         print('   2. allDf2 - After cleaning and normalizing: \n\n', DfCustomPrintFormat(self.allDf2.head()))
 
-
+        # Feature engineering - Cosine similarity, common words and ratio
         if Path(config.allCombinedPath.format('4')).is_file():
             print('   ' + config.allCombinedPath.format('4') + ' already exists. Loading...')
             self.allDf4 = pd.read_csv(config.allCombinedPath.format('4'), na_filter=False)
             self.allDf4 = self.allDf4.drop(self.allDf4.columns[0], axis=1)
         else:
             self.allDf4 = self.allDf2
-            # Count Occurrences of search term as a one string in product title and description
+            # Count Occurrences of search term as one string in product title and description
             self.allDf4['whole_query_in_title'] = self.allDf4['product_info'].map(lambda x: CountOccurrences(x.split('\t')[0], x.split('\t')[1]))
-            self.allDf4['whole_query_in_description'] = self.allDf4['product_info'].map(lambda x: CountOccurrences(x.split('\t')[0], x.split('\t')[2]))
+
             # Cosine similarity between search term product title, brand and material
-            self.allDf4["query_title_cos"] = CosineSimilarity(self.allDf4, "search_term", "product_title")
-            self.allDf4["query_brand_cos"] = CosineSimilarity(self.allDf4, "search_term", "brand")
-            self.allDf4["query_material_cos"] = CosineSimilarity(self.allDf4, "search_term", "material")
+            self.allDf4["title_query_cos"] = CosineSimilarity(self.allDf4, "search_term", "product_title")
+            self.allDf4["brand_query_cos"] = CosineSimilarity(self.allDf4, "search_term", "brand")
+            self.allDf4["material_query_cos"] = CosineSimilarity(self.allDf4, "search_term", "material")
 
-            self.allDf4["mean_s.brand"] = mean_dist(self.allDf4, "search_term", "brand")
-            self.allDf4["mean_s.material"] = mean_dist(self.allDf4, "search_term", "material")
-            self.allDf4["mean_s.title"] = mean_dist(self.allDf4, "search_term", "product_title")
+            # Common words
             self.allDf4.to_csv(config.allCombinedPath.format('4'), na_rep='')
+            self.allDf4['title_query_common_words'] = self.allDf4['product_info'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[1]))
+            self.allDf4['description_query_common_words'] = self.allDf4['product_info'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[2]))
+            self.allDf4['attr'] = self.allDf4['search_term'] + "\t" + self.allDf4['brand'] + "\t" + self.allDf4['color'].astype(str) + "\t" + self.allDf4['material'].astype(str)
+            self.allDf4['brand_query_common_words'] = self.allDf4['attr'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[1]))
+            self.allDf4['color_query_common_words'] = self.allDf4['attr'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[2]))
+            self.allDf4['material_query_common_words'] = self.allDf4['attr'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[3]))
+
+            # Common words ratio
+            self.allDf4['ratio_title'] = self.allDf4['title_query_common_words'] / self.allDf4['len_of_query']
+            self.allDf4['ratio_description'] = self.allDf4['description_query_common_words'] / self.allDf4['len_of_query']
+            self.allDf4['ratio_brand'] = self.allDf4['brand_query_common_words'] / self.allDf4['len_of_brand']
+            self.allDf4['ratio_color'] = self.allDf4['color_query_common_words'] / self.allDf4['len_of_color']
+            self.allDf4['ratio_material'] = self.allDf4['material_query_common_words'] / self.allDf4['len_of_material']
         print('4. allDf4 \n', self.allDf4.head())
-
-
-
-
-
-        ## Added for testing
-        if Path(config.allCombinedPath.format('5')).is_file():
-            print('   ' + config.allCombinedPath.format('5') + ' already exists. Loading...')
-            allDf5 = pd.read_csv(config.allCombinedPath.format('5'))
-            allDf5 = allDf5.drop(self.allDf5.columns[0], axis=1)
-        else:
-            allDf5 = self.allDf4
-            allDf5['word_in_title'] = allDf5['product_info'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[1]))
-            allDf5['word_in_description'] = allDf5['product_info'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[2]))
-            allDf5['ratio_title'] = allDf5['word_in_title'] / allDf5['len_of_query']
-            allDf5['ratio_description'] = allDf5['word_in_description'] / allDf5['len_of_query']
-            allDf5['attr'] = allDf5['search_term'] + "\t" + allDf5['brand'] + "\t" + allDf5['color'].astype(str) + "\t" + allDf5['material'].astype(str)
-            allDf5['word_in_brand'] = allDf5['attr'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[1]))
-            allDf5['word_in_color'] = allDf5['attr'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[2]))
-            allDf5['word_in_material'] = allDf5['attr'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[3]))
-            allDf5['ratio_brand'] = allDf5['word_in_brand'] / allDf5['len_of_brand']
-            allDf5['ratio_color'] = allDf5['word_in_color'] / allDf5['len_of_color']
-            allDf5['ratio_material'] = allDf5['word_in_material'] / allDf5['len_of_material']
-            brandNameDf = pd.unique(allDf5.brand.ravel())
-            d = {}
-            i = 1000
-            for s in brandNameDf:
-                d[s] = i
-                i += 3
-            allDf5['brand_feature'] = allDf5['brand'].map(lambda x: d[x])
-            allDf5['search_term_feature'] = allDf5['search_term'].map(lambda x: len(x))
-            allDf5.to_csv(config.allCombinedPath.format('5'))
-        print('   5. allDf5 \n', allDf5.head())
-        # df_all.to_excel('../intrim/df_all-1.xls')
 
         if Path(config.allForTraining).is_file():
             print('   ' + config.allForTraining + ' already exists. Loading...')
-            allForTrainingDf = pd.read_csv(config.allForTraining)
-            allForTrainingDf = allForTrainingDf.drop(allForTrainingDf.columns[0], axis=1)
+            self.allForTraining = pd.read_csv(config.allForTraining)
+            self.allForTrainingDf = self.allForTrainingDf.drop(self.allForTrainingDf.columns[0], axis=1)
         else:
-            allForTrainingDf = allDf5.drop(['search_term', 'product_title', 'product_description', 'product_info', 'brand', 'color', 'material', 'attr'], axis=1)
-            allForTrainingDf.to_csv(config.allForTraining)
-        print('allForTrainingDf \n', allForTrainingDf.head())
+            self.allForTrainingDf = self.allDf4.drop(['search_term', 'product_title', 'product_description', 'product_info', 'brand', 'color', 'material', 'attr'], axis=1)
+            self.allForTrainingDf.to_csv(config.allForTraining)
+        print('allForTrainingDf \n', self.allForTrainingDf.head())
 
         print("Starting Model Training... ")
-        trainDf = allForTrainingDf.iloc[:num_train]
-        testDf = allForTrainingDf.iloc[num_train:]
+        trainDf = self.allForTrainingDf.iloc[:num_train]
+        testDf = self.allForTrainingDf.iloc[num_train:]
         id_test = testDf['id']
 
         y_train = trainDf['relevance'].values
@@ -391,8 +337,7 @@ class Preprocessor:
 
         pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('../output/submission_V9_RFR.csv', index=False)
 
-        RSME = fmean_squared_error(y_train, yo_pred)
-        print("RandomForestRegressor - RSME = ", RSME)
+        print("RandomForestRegressor - rmse = ", CalculateRmse(y_train, yo_pred))
         # exit()
         ########################## SVR #################################
 
@@ -403,8 +348,8 @@ class Preprocessor:
 
         pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('../output/submission_V9_SVR.csv', index=False)
 
-        RSME = fmean_squared_error(y_train, yo_pred)
-        print("SVR - RSME = ", RSME)
+        rmse = CalculateRmse(y_train, yo_pred)
+        print("SVR RMSE = ", rmse)
 
         ########################## LinearRegression #################################
 
@@ -415,8 +360,8 @@ class Preprocessor:
 
         pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('../output/submission_V9_GLR.csv', index=False)
 
-        RSME = fmean_squared_error(y_train, yo_pred)
-        print("LinearRegression - RSME = ", RSME)
+        rmse = CalculateRmse(y_train, yo_pred)
+        print("LinearRegression RMSE = ", rmse)
 
         ########################## GradientBoostingRegressor #################################
 
@@ -427,5 +372,5 @@ class Preprocessor:
 
         pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('../output/submission_V9_GBR.csv', index=False)
 
-        RSME = fmean_squared_error(y_train, yo_pred)
-        print("GradientBoostingRegressor - RSME = ", RSME)
+        rmse = CalculateRmse(y_train, yo_pred)
+        print("GradientBoostingRegressor RMSE = ", rmse)
