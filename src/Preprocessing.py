@@ -55,7 +55,8 @@ def dist_cosine(data, col1, col2):
     for i in range(len(data.id)):
         title = data[col2][i]
         if title is None or len(title) == 0 or title == "nan":
-            return 0
+            cos.append(0)
+            continue
         st = data[col1][i]
         tfidf = sktf.TfidfVectorizer().fit_transform([st, title])
         c = ((tfidf * tfidf.T).A)[0, 1]
@@ -68,7 +69,8 @@ def mean_dist(data, col1, col2):
     for i in range(len(data)):
         title = data[col2][i]
         if title is None or len(title) == 0 or title == "nan":
-            return 0
+            mean_edit_s_t.append(0)
+            continue
         search = data[col1][i]
         max_edit_s_t_arr = []
         for s in search.split():
@@ -320,6 +322,9 @@ class Preprocessor:
     def Preprocess(self, data, features):
         print('Preprocessing...')
 
+        num_train = data.trainDf.shape[0]
+        print("num_train: {0}\n\n".format(num_train))
+
         # Combine train and test data with product description and extracted features in one DF
         print('   Combining all...')
         if Path(config.allCombinedPath.format('1')).is_file():
@@ -381,3 +386,106 @@ class Preprocessor:
             self.allDf4["mean_s.title"] = mean_dist(self.allDf4, "search_term", "product_title")
             self.allDf4.to_csv(config.allCombinedPath.format('4'), na_rep='')
         print('4. allDf4 \n', self.allDf4.head())
+
+
+
+
+
+        ## Added for testing
+        if Path(config.allCombinedPath.format('5')).is_file():
+            print('   ' + config.allCombinedPath.format('5') + ' already exists. Loading...')
+            allDf5 = pd.read_csv(config.allCombinedPath.format('5'))
+            allDf5 = allDf5.drop(self.allDf5.columns[0], axis=1)
+        else:
+            allDf5 = self.allDf4
+            allDf5['word_in_title'] = allDf5['product_info'].map(lambda x: str_common_word(x.split('\t')[0], x.split('\t')[1]))
+            allDf5['word_in_description'] = allDf5['product_info'].map(lambda x: str_common_word(x.split('\t')[0], x.split('\t')[2]))
+            allDf5['ratio_title'] = allDf5['word_in_title'] / allDf5['len_of_query']
+            allDf5['ratio_description'] = allDf5['word_in_description'] / allDf5['len_of_query']
+            allDf5['attr'] = allDf5['search_term'] + "\t" + allDf5['brand'] + "\t" + allDf5['color'].astype(str) + "\t" + allDf5['material'].astype(str)
+            allDf5['word_in_brand'] = allDf5['attr'].map(lambda x: str_common_word(x.split('\t')[0], x.split('\t')[1]))
+            allDf5['word_in_color'] = allDf5['attr'].map(lambda x: str_common_word(x.split('\t')[0], x.split('\t')[2]))
+            allDf5['word_in_material'] = allDf5['attr'].map(lambda x: str_common_word(x.split('\t')[0], x.split('\t')[3]))
+            allDf5['ratio_brand'] = allDf5['word_in_brand'] / allDf5['len_of_brand']
+            allDf5['ratio_color'] = allDf5['word_in_color'] / allDf5['len_of_color']
+            allDf5['ratio_material'] = allDf5['word_in_material'] / allDf5['len_of_material']
+            brandNameDf = pd.unique(allDf5.brand.ravel())
+            d = {}
+            i = 1000
+            for s in brandNameDf:
+                d[s] = i
+                i += 3
+            allDf5['brand_feature'] = allDf5['brand'].map(lambda x: d[x])
+            allDf5['search_term_feature'] = allDf5['search_term'].map(lambda x: len(x))
+            allDf5.to_csv(config.allCombinedPath.format('5'))
+        print('   5. allDf5 \n', allDf5.head())
+        # df_all.to_excel('../intrim/df_all-1.xls')
+
+        if Path(config.allForTraining).is_file():
+            print('   ' + config.allForTraining + ' already exists. Loading...')
+            allForTrainingDf = pd.read_csv(config.allForTraining)
+            allForTrainingDf = allForTrainingDf.drop(allForTrainingDf.columns[0], axis=1)
+        else:
+            allForTrainingDf = allDf5.drop(['search_term', 'product_title', 'product_description', 'product_info', 'brand', 'color', 'material', 'attr'], axis=1)
+            allForTrainingDf.to_csv(config.allForTraining)
+        print('allForTrainingDf \n', allForTrainingDf.head())
+
+        print("Starting Model Training... ")
+        trainDf = allForTrainingDf.iloc[:num_train]
+        testDf = allForTrainingDf.iloc[num_train:]
+        id_test = testDf['id']
+
+        y_train = trainDf['relevance'].values
+        X_train = trainDf.drop(['id', 'relevance'], axis=1).values
+        X_test = testDf.drop(['id', 'relevance'], axis=1).values
+
+        # print('X_train \n', X_train.head())
+        # print('y_train \n', y_train.head())
+
+        ########################## RandomForestRegressor #################################
+
+        clf = RandomForestRegressor(n_estimators=500, n_jobs=-1, random_state=2016, verbose=1)
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
+        yo_pred = clf.predict(X_train)
+
+        pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('../output/submission_V9_RFR.csv', index=False)
+
+        RSME = fmean_squared_error(y_train, yo_pred)
+        print("RandomForestRegressor - RSME = ", RSME)
+        # exit()
+        ########################## SVR #################################
+
+        clf = SVR(C=1.0, epsilon=0.2)
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
+        yo_pred = clf.predict(X_train)
+
+        pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('../output/submission_V9_SVR.csv', index=False)
+
+        RSME = fmean_squared_error(y_train, yo_pred)
+        print("SVR - RSME = ", RSME)
+
+        ########################## LinearRegression #################################
+
+        clf = linear_model.LinearRegression()
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
+        yo_pred = clf.predict(X_train)
+
+        pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('../output/submission_V9_GLR.csv', index=False)
+
+        RSME = fmean_squared_error(y_train, yo_pred)
+        print("LinearRegression - RSME = ", RSME)
+
+        ########################## GradientBoostingRegressor #################################
+
+        clf = GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=1, random_state=0, loss='ls')
+        clf.fit(X_train, y_train)
+        y_pred = clf.predict(X_test)
+        yo_pred = clf.predict(X_train)
+
+        pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv('../output/submission_V9_GBR.csv', index=False)
+
+        RSME = fmean_squared_error(y_train, yo_pred)
+        print("GradientBoostingRegressor - RSME = ", RSME)
