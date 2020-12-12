@@ -25,43 +25,13 @@ from ngram import NGram
 from nltk.stem.porter import *
 
 
-
-
-def str_common_word(str1, str2):
-    words, cnt = str1.split(), 0
-    for word in words:
-        if str2.find(word) >= 0:
-            cnt += 1
-    return cnt
-
-
-def ngram_similarity(data, col1, col2):
-    cos = []
-    for i in range(len(data.id)):
-        st = data[col1][i]
-        title = data[col2][i]
-        n = NGram(title.split(), key=lambda x: x[1])
-        for s in st.split():
-            n.search(s)
-
-        tfidf = sktf.TfidfVectorizer().fit_transform([st, title])
-        c = ((tfidf * tfidf.T).A)[0, 1]
-        cos.append(c)
-    return cos
-
-
-def dist_cosine(data, col1, col2):
-    cos = []
-    for i in range(len(data.id)):
-        title = data[col2][i]
-        if title is None or len(title) == 0 or title == "nan":
-            cos.append(0)
-            continue
-        st = data[col1][i]
-        tfidf = sktf.TfidfVectorizer().fit_transform([st, title])
-        c = ((tfidf * tfidf.T).A)[0, 1]
-        cos.append(c)
-    return cos
+def CountCommonWords(str1, str2):
+    """Counts the common words longer than 2 chars between str1 and str2"""
+    str1Words = set(str1.split())
+    str2Words = set(str2.split())
+    commonWords = str1Words.intersection(str2Words)
+    commonWords = [word for word in commonWords if len(word) > 2]
+    return len(commonWords)
 
 
 def mean_dist(data, col1, col2):
@@ -85,56 +55,26 @@ def mean_dist(data, col1, col2):
         mean_edit_s_t.append(l / len(max_edit_s_t_arr))
     return mean_edit_s_t
 
-#serach_term , product title
-def seg_words(str1, str2):
-    str2 = str2.lower()
-    str2 = re.sub("[^a-z0-9./]", " ", str2)
-    str2 = [z for z in set(str2.split()) if len(z) > 2]
-    words = str1.lower().split(" ")
-    s = []
-    for word in words:
-        if len(word) > 3:
-            s1 = []
-            s1 += segmentit(word, str2, True)
-            if len(s) > 1:
-                s += [z for z in s1 if z not in ['er', 'ing', 's', 'less'] and len(z) > 1]
-            else:
-                s.append(word)
-        else:
-            s.append(word)
-    return (" ".join(s))
+def CosineSimilarity(data, col1, col2):
+    """Calculates Cosine Similarity between corresponding elements in col1 and col2"""
+    cos = []
+    for i in range(len(data.id)):
+        title = data[col2][i]
+        if title is None or len(title) == 0 or title == "nan":
+            cos.append(0)
+            continue
+        st = data[col1][i]
+        tfidf = sktf.TfidfVectorizer().fit_transform([st, title])
+        c = ((tfidf * tfidf.T).A)[0, 1]
+        cos.append(c)
+    return cos
 
-#s=word in searchterm, txt_arr = words in prod title
-#s = Housing
-#txt_arr = [house, black]
-def segmentit(s, txt_arr, t):
-    st = s
-    r = []
-    for j in range(len(s)):
-        for word in txt_arr:
-            if word == s[:-j]:
-                r.append(s[:-j])
-                # print(s[:-j],s[len(s)-j:])
-                s = s[len(s) - j:]
-                r += segmentit(s, txt_arr, False)
-    if t:
-        i = len(("").join(r))
-        if not i == len(st):
-            r.append(st[i:])
-    return r
 
-#ProdTitle: black door for houses
-
-def str_whole_word(searchTerm, prodTitle, i_):
-    cnt = 0
-    while i_ < len(prodTitle):
-        i_ = prodTitle.find(searchTerm, i_)
-        if i_ == -1:
-            return cnt
-        else:
-            cnt += 1
-            i_ += len(searchTerm)
-    return cnt
+def CountOccurrences(givenString, substring):
+    """Counts occurences of substring in givenString"""
+    if len(substring) < 2:
+        return 0
+    return givenString.count(substring)
 
 
 def fmean_squared_error(ground_truth, predictions):
@@ -373,14 +313,14 @@ class Preprocessor:
             self.allDf4 = self.allDf4.drop(self.allDf4.columns[0], axis=1)
         else:
             self.allDf4 = self.allDf2
-            self.allDf4['search_term'] = self.allDf4['product_info'].map(lambda x: seg_words(x.split('\t')[0], x.split('\t')[1]))
-            self.allDf4['query_in_title'] = self.allDf4['product_info'].map(lambda x: str_whole_word(x.split('\t')[0], x.split('\t')[1], 0))
-            self.allDf4['query_in_description'] = self.allDf4['product_info'].map(lambda x: str_whole_word(x.split('\t')[0], x.split('\t')[2], 0))
-            self.allDf4['query_last_word_in_title'] = self.allDf4['product_info'].map(lambda x: str_common_word(x.split('\t')[0].split(" ")[-1], x.split('\t')[1]))
-            self.allDf4['query_last_word_in_description'] = self.allDf4['product_info'].map(lambda x: str_common_word(x.split('\t')[0].split(" ")[-1], x.split('\t')[2]))
-            self.allDf4["cosine_s.brand"] = dist_cosine(self.allDf4, "search_term", "brand")
-            self.allDf4["cosine_s.material"] = dist_cosine(self.allDf4, "search_term", "material")
-            self.allDf4["cosine_s.title"] = dist_cosine(self.allDf4, "search_term", "product_title")
+            # Count Occurrences of search term as a one string in product title and description
+            self.allDf4['whole_query_in_title'] = self.allDf4['product_info'].map(lambda x: CountOccurrences(x.split('\t')[0], x.split('\t')[1]))
+            self.allDf4['whole_query_in_description'] = self.allDf4['product_info'].map(lambda x: CountOccurrences(x.split('\t')[0], x.split('\t')[2]))
+            # Cosine similarity between search term product title, brand and material
+            self.allDf4["query_title_cos"] = CosineSimilarity(self.allDf4, "search_term", "product_title")
+            self.allDf4["query_brand_cos"] = CosineSimilarity(self.allDf4, "search_term", "brand")
+            self.allDf4["query_material_cos"] = CosineSimilarity(self.allDf4, "search_term", "material")
+
             self.allDf4["mean_s.brand"] = mean_dist(self.allDf4, "search_term", "brand")
             self.allDf4["mean_s.material"] = mean_dist(self.allDf4, "search_term", "material")
             self.allDf4["mean_s.title"] = mean_dist(self.allDf4, "search_term", "product_title")
@@ -398,14 +338,14 @@ class Preprocessor:
             allDf5 = allDf5.drop(self.allDf5.columns[0], axis=1)
         else:
             allDf5 = self.allDf4
-            allDf5['word_in_title'] = allDf5['product_info'].map(lambda x: str_common_word(x.split('\t')[0], x.split('\t')[1]))
-            allDf5['word_in_description'] = allDf5['product_info'].map(lambda x: str_common_word(x.split('\t')[0], x.split('\t')[2]))
+            allDf5['word_in_title'] = allDf5['product_info'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[1]))
+            allDf5['word_in_description'] = allDf5['product_info'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[2]))
             allDf5['ratio_title'] = allDf5['word_in_title'] / allDf5['len_of_query']
             allDf5['ratio_description'] = allDf5['word_in_description'] / allDf5['len_of_query']
             allDf5['attr'] = allDf5['search_term'] + "\t" + allDf5['brand'] + "\t" + allDf5['color'].astype(str) + "\t" + allDf5['material'].astype(str)
-            allDf5['word_in_brand'] = allDf5['attr'].map(lambda x: str_common_word(x.split('\t')[0], x.split('\t')[1]))
-            allDf5['word_in_color'] = allDf5['attr'].map(lambda x: str_common_word(x.split('\t')[0], x.split('\t')[2]))
-            allDf5['word_in_material'] = allDf5['attr'].map(lambda x: str_common_word(x.split('\t')[0], x.split('\t')[3]))
+            allDf5['word_in_brand'] = allDf5['attr'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[1]))
+            allDf5['word_in_color'] = allDf5['attr'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[2]))
+            allDf5['word_in_material'] = allDf5['attr'].map(lambda x: CountCommonWords(x.split('\t')[0], x.split('\t')[3]))
             allDf5['ratio_brand'] = allDf5['word_in_brand'] / allDf5['len_of_brand']
             allDf5['ratio_color'] = allDf5['word_in_color'] / allDf5['len_of_color']
             allDf5['ratio_material'] = allDf5['word_in_material'] / allDf5['len_of_material']

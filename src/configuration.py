@@ -17,7 +17,7 @@ class Configuration:
         self.allForTraining = self.processStages + '/allForTraining.csv'
 
         self.developmentMode = False
-        self.devNumRows = 100
+        self.devNumRows = 500
 
 
 config = Configuration()
