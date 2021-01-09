@@ -11,7 +11,7 @@ from sklearn.metrics import mean_squared_error
 import sklearn.feature_extraction.text as sktf
 from nltk.stem.porter import *
 from src.configuration import config
-
+from collections import Counter
 
 def CountCommonWords(str1, str2):
     """Counts the common words longer than 2 chars between str1 and str2"""
@@ -205,6 +205,17 @@ def CleanAndNormalize(s):
         return "null"
 
 
+def BagOfWordsRelevance(bag_of_words, search_term):
+    dictionary = bag_of_words.split()
+    dictionary = [word for word in dictionary if len(word) > 2]
+    search_term_words_list = search_term.split()
+    search_term_words_list = [word for word in search_term_words_list if len(word) > 2]
+    if len(dictionary) == 0 or len(search_term_words_list) == 0:
+        return 0
+    common_words = set(dictionary).intersection(search_term_words_list)
+    return len(common_words) / len(search_term_words_list)
+
+
 class Preprocessor:
     def __init__(self):
         self.allDf1 = pd.DataFrame()
@@ -251,6 +262,7 @@ class Preprocessor:
             self.allDf2['brand'] = self.allDf2['brand'].map(lambda x: CleanAndNormalize(x))
             self.allDf2['color'] = self.allDf2['color'].astype(str).map(lambda x: CleanAndNormalize(x))
             self.allDf2['material'] = self.allDf2['material'].astype(str).map(lambda x: CleanAndNormalize(x))
+            self.allDf2['bag_of_words'] = self.allDf2['bag_of_words'].astype(str).map(lambda x: CleanAndNormalize(x))
 
             # Count words
             self.allDf2['len_of_query'] = self.allDf2['search_term'].map(lambda x: len(x.split())).astype(np.int64)
@@ -263,11 +275,11 @@ class Preprocessor:
             self.allDf2.to_csv(config.allCombinedPath.format('2'), na_rep='')
         print('   2. allDf2 - After cleaning and normalizing: \n\n', DfCustomPrintFormat(self.allDf2.head()))
 
-        # Feature engineering - Cosine similarity, common words and ratio
+        # Feature engineering - Cosine similarity, common words, ratio and bag of words relevance
         print('   Feature Engineering...')
-        if Path(config.allCombinedPath.format('4')).is_file():
-            print('   ' + config.allCombinedPath.format('4') + ' already exists. Loading...')
-            self.allDf3 = pd.read_csv(config.allCombinedPath.format('4'), na_filter=False)
+        if Path(config.allCombinedPath.format('3')).is_file():
+            print('   ' + config.allCombinedPath.format('3') + ' already exists. Loading...')
+            self.allDf3 = pd.read_csv(config.allCombinedPath.format('3'), na_filter=False)
             self.allDf3 = self.allDf3.drop(self.allDf3.columns[0], axis=1)
         else:
             self.allDf3 = self.allDf2
@@ -296,7 +308,13 @@ class Preprocessor:
             self.allDf3['ratio_brand'] = self.allDf3['brand_query_common_words'] / self.allDf3['len_of_brand']
             self.allDf3['ratio_color'] = self.allDf3['color_query_common_words'] / self.allDf3['len_of_color']
             self.allDf3['ratio_material'] = self.allDf3['material_query_common_words'] / self.allDf3['len_of_material']
-            self.allDf3.to_csv(config.allCombinedPath.format('4'), na_rep='')
+
+            # Bag of words relevance
+            print('      Bag Of Words relevance...')
+            self.allDf3['bag_of_words_relevance'] = self.allDf3.apply(lambda x: BagOfWordsRelevance(x['bag_of_words'], x['search_term']), axis=1)
+
+            self.allDf3.to_csv(config.allCombinedPath.format('3'), na_rep='')
+
         print('   3. allDf3 - After Feature Engineering: \n\n', DfCustomPrintFormat(self.allDf3.head()))
 
         # Prepare for training

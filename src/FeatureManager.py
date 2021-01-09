@@ -31,8 +31,6 @@ class FeatureManager:
             self.bagOfWordsDf.to_csv(config.bagOfWordsPath, na_rep='')
         print('   bagOfWordsDf: \n   {0}\n'.format(DfCustomPrintFormat(self.bagOfWordsDf.head())))
 
-        return
-
         # Brand Name
         print("   Brand name...")
         if Path(config.brandNamePath).is_file():
