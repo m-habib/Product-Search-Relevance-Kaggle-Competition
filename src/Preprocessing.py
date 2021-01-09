@@ -44,10 +44,6 @@ def CountOccurrences(givenString, substring):
     return givenString.count(substring)
 
 
-def CalculateRmse(ground_truth, predictions):
-    return mean_squared_error(ground_truth, predictions) ** 0.5
-
-
 def CleanData(s):
     strNum = {'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9}
     if s is not None and isinstance(s, str) and len(s) > 0:
@@ -227,9 +223,6 @@ class Preprocessor:
 
     def Preprocess(self, data, features):
         print('Preprocessing...')
-
-        num_train = data.trainDf.shape[0]
-        print("num_train: {0}\n\n".format(num_train))
 
         # Combine train and test data with product description and extracted features in one DF
         print('   Combining all...')

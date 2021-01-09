@@ -3,7 +3,7 @@ from pathlib import Path
 from src.DataManager import DataManager
 from src.FeatureManager import FeatureManager
 from src.Preprocessing import Preprocessor
-
+import src.TrainManager as TrainManager
 from src.configuration import config
 from src.utils import DfCustomPrintFormat
 
@@ -18,3 +18,6 @@ features.EngineerFeatures(data)
 # Preprocessing
 preprocessor = Preprocessor()
 preprocessor.Preprocess(data, features)
+
+# Train
+TrainManager.Train(preprocessor)
