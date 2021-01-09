@@ -324,6 +324,6 @@ class Preprocessor:
             self.allForTraining = pd.read_csv(config.allForTraining)
             self.allForTraining = self.allForTraining.drop(self.allForTraining.columns[0], axis=1)
         else:
-            self.allForTraining = self.allDf3.drop(['search_term', 'product_title', 'product_description', 'brand', 'color', 'material'], axis=1)
+            self.allForTraining = self.allDf3.drop(['search_term', 'product_title', 'product_description', 'brand', 'color', 'material', 'bag_of_words'], axis=1)
             self.allForTraining.to_csv(config.allForTraining)
         print('allForTraining \n', self.allForTraining.head())
