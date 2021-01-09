@@ -10,6 +10,7 @@ from nltk import LancasterStemmer
 from sklearn.metrics import mean_squared_error
 import sklearn.feature_extraction.text as sktf
 from nltk.stem.porter import *
+from src.configuration import config
 
 
 def CountCommonWords(str1, str2):
@@ -231,6 +232,7 @@ class Preprocessor:
             self.allDf1 = pd.merge(self.allDf1, features.brandNameDf, how='left', on='product_uid')
             self.allDf1 = pd.merge(self.allDf1, features.colorDf, how='left', on='product_uid')
             self.allDf1 = pd.merge(self.allDf1, features.materialDf, how='left', on='product_uid')
+            self.allDf1 = pd.merge(self.allDf1, features.bagOfWordsDf, how='left', on='product_uid')
             self.allDf1.to_csv(config.allCombinedPath.format('1'), na_rep='')
         print('   1. allDf1 - All combined: \n\n', DfCustomPrintFormat(self.allDf1.head()))
 

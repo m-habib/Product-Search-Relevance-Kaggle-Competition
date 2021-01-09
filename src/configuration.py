@@ -9,6 +9,7 @@ class Configuration:
         self.processStages = '../processStages'
 
         self.brandNamePath = self.featuresPath + '/brandNameDf.csv'
+        self.bagOfWordsPath = self.featuresPath + '/BagOfWords.csv'
         self.containsColorPath = self.featuresPath + '/containsColorDf.csv'
         self.colorPath = self.featuresPath + '/colorDf.csv'
         self.containsMaterialPath = self.featuresPath + '/containsMaterialDf.csv'
@@ -16,8 +17,11 @@ class Configuration:
         self.allCombinedPath = self.processStages + '/allCombinedDf{0}.csv'
         self.allForTraining = self.processStages + '/allForTraining.csv'
 
+        self.bagOfWords = True
+        self.tfIdf = False
+
         self.developmentMode = True
-        self.devNumRows = 2000
+        self.devNumRows = 1000
 
 
 config = Configuration()
