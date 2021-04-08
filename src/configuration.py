@@ -16,12 +16,13 @@ class Configuration:
         self.materialPath = self.featuresPath + '/materialDf.csv'
         self.allCombinedPath = self.processStages + '/allCombinedDf{0}.csv'
         self.allForTraining = self.processStages + '/allForTraining.csv'
+        self.linearRegressionOutputPath = self.outputPath + '/linearRegressionOutput.csv'
 
         self.bagOfWords = True
         self.tfIdf = False
 
         self.developmentMode = True
-        self.devNumRows = 1000
+        self.devNumRows = 200
 
 
 config = Configuration()

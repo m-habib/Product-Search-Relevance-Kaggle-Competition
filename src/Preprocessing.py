@@ -12,6 +12,11 @@ import sklearn.feature_extraction.text as sktf
 from nltk.stem.porter import *
 from src.configuration import config
 from collections import Counter
+from gensim.models import Word2Vec
+from gensim import models
+from scipy import spatial
+
+
 
 def CountCommonWords(str1, str2):
     """Counts the common words longer than 2 chars between str1 and str2"""
@@ -201,6 +206,28 @@ def CleanAndNormalize(s):
         return "null"
 
 
+def CalculateAvgSentenceVector(words, model):
+    """Calculates the average vector of all words in the given words list"""
+    avgVector = np.zeros((300,), dtype="float32")
+    wordsCount = 0
+    for word in words:
+        if word in model:
+            wordsCount += 1
+            avgVector = np.add(avgVector, model[word])
+    if wordsCount > 0:
+        avgVector = np.divide(avgVector, wordsCount)
+    return avgVector
+
+
+def Word2VecRelevance(sentence1, sentence2, word2vecModel):
+    sentence1Words = sentence1.split()
+    sentence2Words = sentence2.split()
+    sentence1AvgVector = CalculateAvgSentenceVector(sentence1, word2vecModel)
+    sentence2AvgVector = CalculateAvgSentenceVector(sentence2, word2vecModel)
+    similarity = 1 - spatial.distance.cosine(sentence1AvgVector, sentence2AvgVector)
+    return similarity
+
+
 def BagOfWordsRelevance(bag_of_words, search_term):
     dictionary = bag_of_words.split()
     dictionary = [word for word in dictionary if len(word) > 2]
@@ -301,6 +328,14 @@ class Preprocessor:
             self.allDf3['ratio_brand'] = self.allDf3['brand_query_common_words'] / self.allDf3['len_of_brand']
             self.allDf3['ratio_color'] = self.allDf3['color_query_common_words'] / self.allDf3['len_of_color']
             self.allDf3['ratio_material'] = self.allDf3['material_query_common_words'] / self.allDf3['len_of_material']
+
+            # Word2Vec
+            print('      Word2Vec relevance...')
+            print('      Loading GoogleNews-vectors-negative300.bin...')
+            word2vecModel = models.KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary=True)
+            print('      Loaded successfully')
+            self.allDf3['word2vec_term_title'] = self.allDf3.apply(lambda x: Word2VecRelevance(x['search_term'], x['product_title'], word2vecModel), axis=1)  # word2vec similarity between search term and product title
+            self.allDf3['word2vec_term_descr'] = self.allDf3.apply(lambda x: Word2VecRelevance(x['search_term'], x['product_description'], word2vecModel), axis=1)  # word2vec similarity between search term and product description
 
             # Bag of words relevance
             print('      Bag Of Words relevance...')
