@@ -25,7 +25,7 @@ class FeatureManager:
             print('   ' + config.bagOfWordsPath + ' already exists. Loading...')
             self.bagOfWordsDf = pd.read_csv(config.bagOfWordsPath, na_filter=False, header=0, names=["product_uid", "bag_of_words"])
         else:
-            self.bagOfWordsDf = data.trainDf.loc[data.trainDf['relevance'] > 2][["product_uid", "search_term"]].rename(columns={"search_term": "bag_of_words"}) # Select search terms where relevance is > 2 and join search terms for each prod_uid
+            self.bagOfWordsDf = data.trainDf.loc[data.trainDf['relevance'] >= 2][["product_uid", "search_term"]].rename(columns={"search_term": "bag_of_words"}) # Select search terms where relevance is > 2 and join search terms for each prod_uid
             self.bagOfWordsDf['bag_of_words'] = self.bagOfWordsDf['bag_of_words'].astype(str)
             self.bagOfWordsDf = self.bagOfWordsDf.groupby('product_uid', as_index=False).agg({'bag_of_words': lambda x: ' '.join(x)})
             self.bagOfWordsDf.to_csv(config.bagOfWordsPath, na_rep='')

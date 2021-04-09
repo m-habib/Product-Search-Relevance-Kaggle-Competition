@@ -19,9 +19,9 @@ class Configuration:
         self.linearRegressionOutputPath = self.outputPath + '/linearRegressionOutput.csv'
 
         self.bagOfWords = True
-        self.tfIdf = False
+        self.tfIdf = True
 
-        self.developmentMode = True
+        self.developmentMode = False
         self.devNumRows = 200
 
 

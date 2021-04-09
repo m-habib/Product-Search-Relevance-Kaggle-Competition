@@ -15,6 +15,7 @@ from collections import Counter
 from gensim.models import Word2Vec
 from gensim import models
 from scipy import spatial
+import math
 
 
 
@@ -154,17 +155,6 @@ def SpellCorrect(s):
         return ""
 
 
-def CleanAndNormalize(s):
-    if isinstance(s, str):
-        s = CleanData(s)
-        s = SpellCorrect(s)
-        s = Stem(s)
-        s = Lemmatize(s)
-        return s
-    else:
-        return ""
-
-
 def Lemmatize(s):
     if s != "null" and isinstance(s, str):
         s = s.lower()
@@ -197,6 +187,7 @@ def SpellCorrect(s):
 
 def CleanAndNormalize(s):
     if isinstance(s, str):
+        print('Log: CleanAndNormalize: ' + str(s))
         s = CleanData(s)
         s = SpellCorrect(s)
         s = Stem(s)
@@ -219,24 +210,58 @@ def CalculateAvgSentenceVector(words, model):
     return avgVector
 
 
+def word2vecExactMatch(words1, words2, word2vecModel):
+    '''Counts the number of words in words1 that doesn't exist in Google's word2vec model but is a common word between words1 and words2'''
+    count = 0
+    for word in words1:
+        if word not in word2vecModel and word in words2:
+            print('     Word not in model: ' + word)
+            count += 1
+    return count
+
+
 def Word2VecRelevance(sentence1, sentence2, word2vecModel):
+    print('Log: Word2VecRelevance: ')
+    print('     1. ' + str(sentence1))
+    print('     2. ' + str(sentence2))
     sentence1Words = sentence1.split()
     sentence2Words = sentence2.split()
-    sentence1AvgVector = CalculateAvgSentenceVector(sentence1, word2vecModel)
-    sentence2AvgVector = CalculateAvgSentenceVector(sentence2, word2vecModel)
-    similarity = 1 - spatial.distance.cosine(sentence1AvgVector, sentence2AvgVector)
+    similarity = 0
+    try:
+        sentence1AvgVector = CalculateAvgSentenceVector(sentence1Words, word2vecModel)
+        sentence2AvgVector = CalculateAvgSentenceVector(sentence2Words, word2vecModel)
+        similarity = 1 - spatial.distance.cosine(sentence1AvgVector, sentence2AvgVector)
+    except Exception as e:
+        print('Error Message: ' + str(e))
+        print('keep similarity 0')
+        similarity = 0
+    # if math.isnan(similarity):
+    #     print('replacing nan with 0')
+    #     similarity = 0
+
+    exactMatch = word2vecExactMatch(sentence1Words, sentence2Words, word2vecModel)
+    if exactMatch > 0:
+        print('     exact match: ' + str(exactMatch))
+
+    similarity += exactMatch
+    print('     similarity. ' + str(similarity))
     return similarity
 
 
 def BagOfWordsRelevance(bag_of_words, search_term):
+    print('Log: BagOfWordsRelevance: ')
+    print('     bagOfWords.  ' + str(bag_of_words))
+    print('     SearchTerm.  ' + str(search_term))
     dictionary = bag_of_words.split()
     dictionary = [word for word in dictionary if len(word) > 2]
     search_term_words_list = search_term.split()
     search_term_words_list = [word for word in search_term_words_list if len(word) > 2]
-    if len(dictionary) == 0 or len(search_term_words_list) == 0:
+    if bag_of_words == 0 or len(dictionary) == 0 or len(search_term_words_list) == 0:
         return 0
     common_words = set(dictionary).intersection(search_term_words_list)
-    return len(common_words) / len(search_term_words_list)
+    result = len(common_words) / len(search_term_words_list)
+    print('     Result:  ' + str(result))
+    return result
 
 
 class Preprocessor:
@@ -244,7 +269,7 @@ class Preprocessor:
         self.allDf1 = pd.DataFrame()
         self.allDf2 = pd.DataFrame()
         self.allDf3 = pd.DataFrame()
-        self.allDf3 = pd.DataFrame()
+        self.allDf4 = pd.DataFrame()
         self.allDf5 = pd.DataFrame()
         self.allForTraining = pd.DataFrame()
 
@@ -265,7 +290,9 @@ class Preprocessor:
             self.allDf1 = pd.merge(self.allDf1, features.materialDf, how='left', on='product_uid')
             self.allDf1 = pd.merge(self.allDf1, features.bagOfWordsDf, how='left', on='product_uid')
             self.allDf1.to_csv(config.allCombinedPath.format('1'), na_rep='')
-        print('   1. allDf1 - All combined: \n\n', DfCustomPrintFormat(self.allDf1.head()))
+            print('   1. allDf1 - All combined: \n\n', DfCustomPrintFormat(self.allDf1.head()))
+        self.allDf1.fillna(0, inplace=True)
+
 
         # Clean and normalize
         print('   Cleaning and Normalize data...')
@@ -292,58 +319,87 @@ class Preprocessor:
             self.allDf2['len_of_color'] = self.allDf2['color'].astype(str).map(lambda x: len(x.split())).astype(np.int64)
             self.allDf2['len_of_material'] = self.allDf2['material'].astype(str).map(lambda x: len(x.split())).astype(np.int64)
             self.allDf2['len_of_search_term'] = self.allDf2['search_term'].map(lambda x: len(x))
+            self.allDf2.fillna(0, inplace=True)
             self.allDf2.to_csv(config.allCombinedPath.format('2'), na_rep='')
-        print('   2. allDf2 - After cleaning and normalizing: \n\n', DfCustomPrintFormat(self.allDf2.head()))
+            print('   2. allDf2 - After cleaning and normalizing: \n\n', DfCustomPrintFormat(self.allDf2.head()))
+        self.allDf2.fillna(0, inplace=True)
 
-        # Feature engineering - Cosine similarity, common words, ratio and bag of words relevance
-        print('   Feature Engineering...')
+        # Feature engineering - Bag of Words
+        print('   Feature Engineering 3...')
         if Path(config.allCombinedPath.format('3')).is_file():
             print('   ' + config.allCombinedPath.format('3') + ' already exists. Loading...')
             self.allDf3 = pd.read_csv(config.allCombinedPath.format('3'), na_filter=False)
             self.allDf3 = self.allDf3.drop(self.allDf3.columns[0], axis=1)
         else:
             self.allDf3 = self.allDf2
+            # Bag of Words relevance
+            print('      Bag Of Words relevance...')
+            self.allDf3['bag_of_words_relevance'] = self.allDf3.apply(lambda x: BagOfWordsRelevance(x['bag_of_words'], x['search_term']), axis=1)
+            self.allDf3.fillna(0, inplace=True)
+            self.allDf3.to_csv(config.allCombinedPath.format('3'), na_rep='')
+            print('   3. allDf3 - After BagOfWords 3: \n\n', DfCustomPrintFormat(self.allDf3.head()))
+        self.allDf3.fillna(0, inplace=True)
 
-            # Count Occurrences of search term as one string in product title and description
-            self.allDf3['whole_query_in_title'] = self.allDf3.apply(lambda x: CountOccurrences(x['search_term'], x['product_title']), axis=1)
-
-            # Cosine similarity between search term product title, brand and material
-            print('      Cosine Similarity...')
-            self.allDf3["title_query_cos"] = CosineSimilarity(self.allDf3, "search_term", "product_title")
-            self.allDf3["brand_query_cos"] = CosineSimilarity(self.allDf3, "search_term", "brand")
-            self.allDf3["material_query_cos"] = CosineSimilarity(self.allDf3, "search_term", "material")
-
-            # Common words
-            print('      Common Words...')
-            self.allDf3['title_query_common_words'] = self.allDf3.apply(lambda x: CountCommonWords(x['search_term'], x['product_title']), axis=1)
-            self.allDf3['description_query_common_words'] = self.allDf3.apply(lambda x: CountCommonWords(x['search_term'], x['product_description']), axis=1)
-            self.allDf3['brand_query_common_words'] = self.allDf3.apply(lambda x: CountCommonWords(x['search_term'], x['brand']), axis=1)
-            self.allDf3['color_query_common_words'] = self.allDf3.apply(lambda x: CountCommonWords(x['search_term'], x['color']), axis=1)
-            self.allDf3['material_query_common_words'] = self.allDf3.apply(lambda x: CountCommonWords(x['search_term'], x['material']), axis=1)
-
-            # Common words ratio
-            print('      Common Words Ratio...')
-            self.allDf3['ratio_title'] = self.allDf3['title_query_common_words'] / self.allDf3['len_of_query']
-            self.allDf3['ratio_description'] = self.allDf3['description_query_common_words'] / self.allDf3['len_of_query']
-            self.allDf3['ratio_brand'] = self.allDf3['brand_query_common_words'] / self.allDf3['len_of_brand']
-            self.allDf3['ratio_color'] = self.allDf3['color_query_common_words'] / self.allDf3['len_of_color']
-            self.allDf3['ratio_material'] = self.allDf3['material_query_common_words'] / self.allDf3['len_of_material']
-
+        # Feature engineering - Word2Vec
+        print('   Feature Engineering 4...')
+        if Path(config.allCombinedPath.format('4')).is_file():
+            print('   ' + config.allCombinedPath.format('4') + ' already exists. Loading...')
+            self.allDf4 = pd.read_csv(config.allCombinedPath.format('4'), na_filter=False)
+            self.allDf4 = self.allDf4.drop(self.allDf4.columns[0], axis=1)
+        else:
+            self.allDf4 = self.allDf3
             # Word2Vec
             print('      Word2Vec relevance...')
             print('      Loading GoogleNews-vectors-negative300.bin...')
             word2vecModel = models.KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary=True)
             print('      Loaded successfully')
-            self.allDf3['word2vec_term_title'] = self.allDf3.apply(lambda x: Word2VecRelevance(x['search_term'], x['product_title'], word2vecModel), axis=1)  # word2vec similarity between search term and product title
-            self.allDf3['word2vec_term_descr'] = self.allDf3.apply(lambda x: Word2VecRelevance(x['search_term'], x['product_description'], word2vecModel), axis=1)  # word2vec similarity between search term and product description
+            self.allDf4['word2vec_term_title'] = self.allDf4.apply(lambda x: Word2VecRelevance(x['search_term'], x['product_title'], word2vecModel), axis=1)  # word2vec similarity between search term and product title
+            self.allDf4['word2vec_term_descr'] = self.allDf4.apply(lambda x: Word2VecRelevance(x['search_term'], x['product_description'], word2vecModel), axis=1)  # word2vec similarity between search term and product description
+            self.allDf4['word2vec_term_color'] = self.allDf4.apply(lambda x: Word2VecRelevance(x['search_term'], x['color'], word2vecModel), axis=1)  # word2vec similarity between search term and product color
+            self.allDf4['word2vec_term_mater'] = self.allDf4.apply(lambda x: Word2VecRelevance(x['search_term'], x['material'], word2vecModel), axis=1)  # word2vec similarity between search term and product material
+            self.allDf4['word2vec_term_brand'] = self.allDf4.apply(lambda x: Word2VecRelevance(x['search_term'], x['brand'], word2vecModel), axis=1)  # word2vec similarity between search term and product brand
+            self.allDf4.fillna(0, inplace=True)
+            self.allDf4.to_csv(config.allCombinedPath.format('4'), na_rep='')
+        self.allDf4.fillna(0, inplace=True)
 
-            # Bag of words relevance
-            print('      Bag Of Words relevance...')
-            self.allDf3['bag_of_words_relevance'] = self.allDf3.apply(lambda x: BagOfWordsRelevance(x['bag_of_words'], x['search_term']), axis=1)
+        # Feature engineering - Cosine similarity and Common Words
+        print('   Feature Engineering 5...')
+        if Path(config.allCombinedPath.format('5')).is_file():
+            print('   ' + config.allCombinedPath.format('5') + ' already exists. Loading...')
+            self.allDf5 = pd.read_csv(config.allCombinedPath.format('5'), na_filter=False)
+            self.allDf5 = self.allDf5.drop(self.allDf5.columns[0], axis=1)
+        else:
+            self.allDf5 = self.allDf4
 
-            self.allDf3.to_csv(config.allCombinedPath.format('3'), na_rep='')
+            # Count Occurrences of search term as one string in product title and description
+            self.allDf5['whole_query_in_title'] = self.allDf5.apply(lambda x: CountOccurrences(x['search_term'], x['product_title']), axis=1)
 
-        print('   3. allDf3 - After Feature Engineering: \n\n', DfCustomPrintFormat(self.allDf3.head()))
+            # Cosine similarity between search term product title, brand and material
+            print('      Cosine Similarity...')
+            self.allDf5["title_query_cos"] = CosineSimilarity(self.allDf5, "search_term", "product_title")
+            self.allDf5["brand_query_cos"] = CosineSimilarity(self.allDf5, "search_term", "brand")
+            # self.allDf5["material_query_cos"] = CosineSimilarity(self.allDf5, "search_term", "material")
+
+            # Common words
+            print('      Common Words...')
+            self.allDf5['title_query_common_words'] = self.allDf5.apply(lambda x: CountCommonWords(x['search_term'], x['product_title']), axis=1)
+            self.allDf5['description_query_common_words'] = self.allDf5.apply(lambda x: CountCommonWords(x['search_term'], x['product_description']), axis=1)
+            self.allDf5['brand_query_common_words'] = self.allDf5.apply(lambda x: CountCommonWords(x['search_term'], x['brand']), axis=1)
+            self.allDf5['color_query_common_words'] = self.allDf5.apply(lambda x: CountCommonWords(x['search_term'], x['color']), axis=1)
+            self.allDf5['material_query_common_words'] = self.allDf5.apply(lambda x: CountCommonWords(x['search_term'], x['material']), axis=1)
+
+            # Common words ratio
+            print('      Common Words Ratio...')
+            self.allDf5['ratio_title'] = self.allDf5['title_query_common_words'] / self.allDf5['len_of_query']
+            self.allDf5['ratio_description'] = self.allDf5['description_query_common_words'] / self.allDf5['len_of_query']
+            self.allDf5['ratio_brand'] = self.allDf5['brand_query_common_words'] / self.allDf5['len_of_brand']
+            self.allDf5['ratio_color'] = self.allDf5['color_query_common_words'] / self.allDf5['len_of_color']
+            self.allDf5['ratio_material'] = self.allDf5['material_query_common_words'] / self.allDf5['len_of_material']
+
+            self.allDf5.fillna(0, inplace=True)
+            self.allDf5.to_csv(config.allCombinedPath.format('5'), na_rep='')
+            print('   4. allDf5 - After Feature Engineering: \n\n', DfCustomPrintFormat(self.allDf5.head()))
+        self.allDf5.fillna(0, inplace=True)
 
         # Prepare for training
         print('   Preparing for training...')
@@ -352,6 +408,7 @@ class Preprocessor:
             self.allForTraining = pd.read_csv(config.allForTraining)
             self.allForTraining = self.allForTraining.drop(self.allForTraining.columns[0], axis=1)
         else:
-            self.allForTraining = self.allDf3.drop(['search_term', 'product_title', 'product_description', 'brand', 'color', 'material', 'bag_of_words'], axis=1)
+            self.allForTraining = self.allDf5.drop(['search_term', 'product_title', 'product_description', 'brand', 'color', 'material', 'bag_of_words'], axis=1)
             self.allForTraining.to_csv(config.allForTraining)
-        print('allForTraining \n', self.allForTraining.head())
+            print('allForTraining \n', self.allForTraining.head())
+        self.allForTraining.fillna(0, inplace=True)
