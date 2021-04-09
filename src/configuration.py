@@ -17,6 +17,8 @@ class Configuration:
         self.allCombinedPath = self.processStages + '/allCombinedDf{0}.csv'
         self.allForTraining = self.processStages + '/allForTraining.csv'
         self.linearRegressionOutputPath = self.outputPath + '/linearRegressionOutput.csv'
+        self.gradientBoostingRegressorOutputPath = self.outputPath + '/gradientBoostingRegressorOutput.csv'
+        self.randomForestRegressorOutputPath = self.outputPath + '/randomForestRegressorOutput.csv'
 
         self.bagOfWords = True
         self.tfIdf = True

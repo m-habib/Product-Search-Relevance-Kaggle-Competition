@@ -20,4 +20,4 @@ preprocessor = Preprocessor()
 preprocessor.Preprocess(data, features)
 
 # Train
-TrainManager.Train(preprocessor)
+TrainManager.Train(preprocessor, data)
