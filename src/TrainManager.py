@@ -22,6 +22,8 @@ def Train(preprocessor, data):
     print("Starting Model Training... ")
 
     num_train = data.trainDf.shape[0]
+    num_train_error_calc = 15000
+    num_train_for_model = num_train - num_train_error_calc
     print("Train data size: " + str(num_train))
 
     trainDf = preprocessor.allForTraining.iloc[:num_train]
@@ -29,36 +31,42 @@ def Train(preprocessor, data):
     id_test = testDf['id']
 
     y_train = trainDf['relevance'].values
-    X_train = trainDf.drop(['id', 'relevance'], axis=1).values
+    y_train_for_model = (trainDf.iloc[:num_train_for_model])['relevance'].values
+    y_train_error_calc = (trainDf.iloc[num_train_for_model:])['relevance'].values
+    # X_train = trainDf.drop(['id', 'relevance'], axis=1).values
+    X_train_all = trainDf.drop(['id', 'relevance'], axis=1).values
     X_test = testDf.drop(['id', 'relevance'], axis=1).values
+    X_train_for_model = (trainDf.iloc[:num_train_for_model]).drop(['id', 'relevance'], axis=1).values
+    X_train_for_error_calc = (trainDf.iloc[num_train_for_model:]).drop(['id', 'relevance'], axis=1).values
+
 
     # RandomForestRegressor
     clf = RandomForestRegressor(n_estimators=500, n_jobs=-1, random_state=2016, verbose=1)
-    clf.fit(X_train, y_train)
+    clf.fit(X_train_for_model, y_train_for_model)
     y_pred = clf.predict(X_test)
-    yo_pred = clf.predict(X_train)
+    yo_pred = clf.predict(X_train_for_error_calc)
 
     pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv(config.randomForestRegressorOutputPath, index=False)
-    print("RandomForestRegressor - RMSE = ", CalculateRmse(y_train, yo_pred))
-    print("RandomForestRegressor - ABS = ", CalculateAbsError(y_train, yo_pred))
-    print("RandomForestRegressor - ABS Perc = ", CalculateAbsolutePercentageError(y_train, yo_pred))
+    print("RandomForestRegressor - RMSE = ", CalculateRmse(y_train_error_calc, yo_pred))
+    print("RandomForestRegressor - ABS = ", CalculateAbsError(y_train_error_calc, yo_pred))
+    print("RandomForestRegressor - ABS Perc = ", CalculateAbsolutePercentageError(y_train_error_calc, yo_pred))
 
     # GradientBoostingRegressor
     clf = GradientBoostingRegressor(n_estimators=100, learning_rate=0.1, max_depth=1, random_state=0, loss='ls')
-    clf.fit(X_train, y_train)
+    clf.fit(X_train_for_model, y_train_for_model)
     y_pred = clf.predict(X_test)
-    yo_pred = clf.predict(X_train)
+    yo_pred = clf.predict(X_train_for_error_calc)
     pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv(config.gradientBoostingRegressorOutputPath, index=False)
-    print("GradientBoostingRegressor - RMSE = ", CalculateRmse(y_train, yo_pred))
-    print("GradientBoostingRegressor - ABS = ", CalculateAbsError(y_train, yo_pred))
-    print("GradientBoostingRegressor - ABS Perc = ", CalculateAbsolutePercentageError(y_train, yo_pred))
+    print("\n\nGradientBoostingRegressor - RMSE = ", CalculateRmse(y_train_error_calc, yo_pred))
+    print("GradientBoostingRegressor - ABS = ", CalculateAbsError(y_train_error_calc, yo_pred))
+    print("GradientBoostingRegressor - ABS Perc = ", CalculateAbsolutePercentageError(y_train_error_calc, yo_pred))
 
     # LinearRegression
     clf = linear_model.LinearRegression()
-    clf.fit(X_train, y_train)
+    clf.fit(X_train_for_model, y_train_for_model)
     y_pred = clf.predict(X_test)
-    yo_pred = clf.predict(X_train)
+    yo_pred = clf.predict(X_train_for_error_calc)
     pd.DataFrame({"id": id_test, "relevance": y_pred}).to_csv(config.linearRegressionOutputPath, index=False)
-    print("LinearRegression - RMSE = ", CalculateRmse(y_train, yo_pred))
-    print("LinearRegression - ABS = ", CalculateAbsError(y_train, yo_pred))
-    print("LinearRegression - ABS Perc = ", CalculateAbsolutePercentageError(y_train, yo_pred))
+    print("\n\nLinearRegression - RMSE = ", CalculateRmse(y_train_error_calc, yo_pred))
+    print("LinearRegression - ABS = ", CalculateAbsError(y_train_error_calc, yo_pred))
+    print("LinearRegression - ABS Perc = ", CalculateAbsolutePercentageError(y_train_error_calc, yo_pred))
