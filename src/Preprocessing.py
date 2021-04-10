@@ -1,22 +1,20 @@
 # This class is responsible for data preprocessing: stemming, spellchecking, etc.
 # The final data for training will be available in allForTraining attribute after calling Preprocess function
-
+import nltk
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from src.configuration import config
-from src.utils import DfCustomPrintFormat
 from nltk import LancasterStemmer
-from sklearn.metrics import mean_squared_error
 import sklearn.feature_extraction.text as sktf
 from nltk.stem.porter import *
 from src.configuration import config
-from collections import Counter
-from gensim.models import Word2Vec
 from gensim import models
 from scipy import spatial
-import math
+from textblob import TextBlob
+from nltk.corpus import stopwords
 
+
+stop_words = set(stopwords.words('english'))
 
 
 def CountCommonWords(str1, str2):
@@ -107,9 +105,15 @@ def CleanData(s):
         s = re.sub(r"([0-9]+)( *)(amperes|ampere|amps|amp)\.?", r"\1amp. ", s)  # Uniforms units
         s = s.replace(" . ", " ")  # Remove irrelevant chars
         s = (" ").join([str(strNum[z]) if z in strNum else z for z in s.split(" ")])  # Word to number
+        s = s.replace('.', '')
+        s = s.replace(',', '')
+        s = s.replace('`', '')
+        s = s.replace('\'', '')
+
         s = " ".join(s.split())  # Replace whitespace with single space
 
-        # TODO: bbq
+        if s in stop_words:
+            return ""
         return s
     else:
         return ""
@@ -136,6 +140,7 @@ def Lemmatize(s):
 
 def SpellCorrect(s):
     if s is not None and isinstance(s, str) and len(s) > 0:
+        #s = str(TextBlob(s).correct())
         s = s.lower()
         s = s.replace("toliet", "toilet")
         s = s.replace("vynal", "vinyl")
@@ -169,7 +174,6 @@ def StemAndLemmatize(s):
     if isinstance(s, str):
         #print('Log: StemAndLemmatize: ' + str(s))
         s = Stem(s)
-        s = Lemmatize(s)
         return s
     else:
         return ""
@@ -357,11 +361,12 @@ class Preprocessor:
             self.allDf5['len_of_color'] = self.allDf5['color'].astype(str).map(lambda x: len(x.split())).astype(np.int64)
             self.allDf5['len_of_material'] = self.allDf5['material'].astype(str).map(lambda x: len(x.split())).astype(np.int64)
 
-            # Count Occurrences of search term as one string in product title and description
+            # Count Occurrences of search term as an exact match title and description
             self.allDf5['whole_query_in_title'] = self.allDf5.apply(lambda x: CountOccurrences(x['search_term'], x['product_title']), axis=1)
 
             # Cosine similarity between search term product title, brand and material
             print('      Cosine Similarity...')
+            self.allDf5["descr_query_cos"] = CosineSimilarity(self.allDf5, "search_term", "product_description")
             self.allDf5["title_query_cos"] = CosineSimilarity(self.allDf5, "search_term", "product_title")
             self.allDf5["brand_query_cos"] = CosineSimilarity(self.allDf5, "search_term", "brand")
             # self.allDf5["material_query_cos"] = CosineSimilarity(self.allDf5, "search_term", "material")
@@ -385,7 +390,6 @@ class Preprocessor:
             self.allDf5.fillna(0, inplace=True)
             self.allDf5.to_csv(config.allCombinedPath.format('5'), na_rep='')
         self.allDf5.fillna(0, inplace=True)
-
 
         # Prepare for training
         print('   Preparing for training...')
