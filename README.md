@@ -5,7 +5,7 @@
 In this project I have built a Machine Learning system which can help Online Shopping Websites:
  * Suggest the most appropriate products, based on customer search queries.
  * Speed up getting to the product.
- * Suggests similar products.
+ * Suggest similar products.
  
 This was done using 3 main NLP approaches:
   * TF*IDF.
@@ -20,4 +20,4 @@ Run instructions:
   3. Copy the downloaded data to: Repo\data
   4. Download Google GoogleNews-vectors-negative300.bin from here: https://github.com/mmihaltz/word2vec-GoogleNews-vectors
   5. Extract the gz file, navigate to the extracted dir and copy the .bin file to Repo\src
-  6. Run main 
+  6. Run main.
