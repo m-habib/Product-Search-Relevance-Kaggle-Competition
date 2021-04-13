@@ -15,7 +15,7 @@ This was done using 3 main NLP approaches:
 ------
 
 Run instructions:
-  1. clone this repo.
+  1. Clone this repo.
   2. Download Dataset from: https://www.kaggle.com/c/home-depot-product-search-relevance/data
   3. Copy the downloaded data to: Repo\data
   4. Download Google GoogleNews-vectors-negative300.bin from here: https://github.com/mmihaltz/word2vec-GoogleNews-vectors
